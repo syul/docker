@@ -1,0 +1,203 @@
+services:
+  postgres:
+    container_name: postgres_container
+    image: postgres:16.2-alpine3.19
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.6
+    restart: unless-stopped
+
+  mongo1:
+    image: mongo:7.0
+    container_name: mongo1
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/etc/mongodb/pki/keyfile"]
+    restart: always
+    ports:
+      - 27017:27017
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.2
+    volumes:
+      - ./rs_keyfile:/etc/mongodb/pki/keyfile
+      - mongo_1_data:/data/db
+      - mongo_1_config:/data/configdb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  mongo2:
+    image: mongo:7.0
+    container_name: mongo2
+    command: ["--replSet", "rs0" ,"--bind_ip_all", "--port", "27018","--keyFile", "/etc/mongodb/pki/keyfile"]
+    restart: always
+    ports:
+      - 27018:27018
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.3
+    volumes:
+      - ./rs_keyfile:/etc/mongodb/pki/keyfile
+      - mongo_2_data:/data/db
+      - mongo_2_config:/data/configdb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  mongo3:
+    image: mongo:7.0
+    container_name: mongo3
+    command: ["--replSet", "rs0" ,"--bind_ip_all", "--port", "27019","--keyFile", "/etc/mongodb/pki/keyfile"]
+    restart: always
+    ports:
+      - 27019:27019
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.4
+    volumes:
+      - ./rs_keyfile:/etc/mongodb/pki/keyfile
+      - mongo_3_data:/data/db
+      - mongo_3_config:/data/configdb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  rabbit_mq:
+    image: rabbitmq:4-management-alpine
+    container_name: 'rabbit_mq'
+    restart: always
+    ports:
+        - 5672:5672
+        - 15672:15672
+    volumes:
+        - rabbit_mq_data:/var/lib/rabbitmq/
+        - rabbit_mq_log:/var/log/rabbitmq
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.5
+    environment:
+      RABBITMQ_DEFAULT_PASS: example
+      RABBITMQ_DEFAULT_USER: root
+  inngest:
+    hostname: inngest
+    image: inngest/inngest:v0.27.0
+    command: 'inngest dev -u http://172.17.0.1:3000/api/inngest'
+    ports:
+      - '8288:8288'
+    restart: unless-stopped
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.7
+  redis_master:
+    image: redis:7.4.1-alpine
+    container_name: redis-master
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.8
+    volumes:
+      - redis_data_master:/data
+    environment:
+      - REDIS_PASSWORD=example
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_REPLICATION_PASSWORD=example
+  redis_slave:
+    image: redis:7.4.1-alpine
+    container_name: redis-slave
+    restart: always
+    ports:
+      - 6380:6380
+    networks:
+      cluster_network:
+        ipv4_address: 111.222.32.9
+    volumes:
+      - redis_data_slave:/data
+    environment:
+      - REDIS_PASSWORD=example
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_REPLICATION_PASSWORD=example
+      - REDIS_REPLICATION_HOST=redis-master
+      - REDIS_REPLICATION_PORT=6379
+volumes:
+  mongo_1_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_1_data
+  mongo_1_config:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_1_config
+  mongo_2_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_2_data
+  mongo_2_config:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_2_config
+  mongo_3_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_3_data
+  mongo_3_config:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/mongo_3_config
+  rabbit_mq_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/rabbit_mq_data
+  rabbit_mq_log:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/rabbit_mq_logs
+  postgres:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/postgres
+  redis_data_master:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/redis_data_master
+  redis_data_slave:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./data/redis_data_slave
+
+networks:
+  cluster_network:
+    ipam:
+      config:
+        - subnet: 111.222.32.0/24
