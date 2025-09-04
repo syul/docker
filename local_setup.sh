@@ -13,3 +13,5 @@ mkdir --parents data/rabbit_mq_logs
 mkdir --parents data/postgres
 mkdir --parents data/redis_data_master
 mkdir --parents data/redis_data_slave
+
+mkdir --parents dump
